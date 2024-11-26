@@ -38,7 +38,7 @@ static void UpdateSysTime();
 // Returns the attitude quaternion reading in q and angular velocity in v.
 static void ReadImu(imu::Quaternion &q, imu::Vector<3> &v);
 
-static void print_float_array(volatile float *array, int array_len, const char *array_identifier);
+static void pull_from_serial();
 
 void setup()
 {
@@ -49,9 +49,9 @@ void setup()
   SetupSd();
   SetupRpm();
 
-  Serial.print(serial_stuff::MCU_init_phrase);
+  Serial.write(serial_stuff::MCU_init_phrase);
 
-  delay(test_parameters::timeout_sec * 1000);
+  delay(test_parameters::test_delay * 1000);
 
   timer::init_time = millis();
   timer::loop_start_time = timer::init_time;
@@ -59,9 +59,13 @@ void setup()
   test_parameters::timeout_sec = (test_parameters::timeout_sec * 1000) + timer::init_time;
 }
 
-static int counter = 0;
-static bool should_print = false;
+imu::Quaternion target_quaternion(0, 0, 0, 0);
+float target_RPM[4] = {0, 0, 0, 0};
+bool is_using_quaternion = true;
+
 static bool activated = false;
+
+static int counter = 0;
 void loop()
 {
 
@@ -78,12 +82,12 @@ void loop()
   /*
   This short block decides whether or not the current loop is one where values should be printed
   This is its own block because different print functions need to occur at different places, and it saves having to do the calculation multiple different times.
-  ie if you want to print both target quaternion and target rpm, those don't exist at the same time so you need separate print blocks for each, and having the should_print flag improves readability
+  ie if you want to print both target quaternion and target rpm, those don't exist at the same time so you need separate print blocks for each, and having the should_serial flag improves readability
   */
-  bool should_print = false;
+  bool should_serial = false;
   if (counter % serial_stuff::cycles_per_print == 0)
   {
-    should_print = true;
+    should_serial = true;
   }
 
   UpdateSysTime();
@@ -94,84 +98,128 @@ void loop()
   imu::Vector<3> current_gyro_reading;
   ReadImu(current_quaternion, current_gyro_reading);
 
-  if (should_print)
+  if (should_serial)
   {
-    byte quaternion_bytes[12];
-    float current_quaternion_float[4] = {current_quaternion.w(), current_quaternion.x(), current_quaternion.y(), current_quaternion.z()};
-    serial_stuff::encode_4_floats(current_quaternion_float, quaternion_bytes);
+    //  11,  "get_quaternion"
+    serial_stuff::write_quaternion_to_serial(11, current_quaternion);
 
-    Serial.write(serial_stuff::start_byte);
-    for (int i = 0; i < 16; i++)
-    {
-      Serial.write(quaternion_bytes[i]);
-    }
-    Serial.write(serial_stuff::stop_byte);
+    //  21, "get_rpm"
+    serial_stuff::write_4_floats_to_serial(21, interrupt::wheel_rpm);
   }
-  // imu::Quaternion qe = test_parameters::target_quaternion.conjugate() * current_quaternion;
 
-  // this block of code is responsible for the testing logic
+  pull_from_serial();
 
-  if ((test_parameters::list_of_tests[test_parameters::test_index].is_indefinite == true) || test_parameters::list_of_tests[test_parameters::test_index].delay_time < (millis() - test_parameters::test_init_time))
-  // this if statement checks if either the current test's time hasn't elapsed or whether the current test has the indefinite value set to true, if yes to either the test changes
+  if (serial_stuff::unparsed_from_serial == true)
   {
-    /*if a test is going on, this codeblock runs*/
+    switch (serial_stuff::current_command)
+    {
+    case 0: // "stop"
+      activated = static_cast<bool>(serial_stuff::current_argument[0]);
+      break;
+    case 10: //  "set_quaternion"
+      serial_stuff::FLOATUNION_t current_quaternion_float[4];
+      memcpy(serial_stuff::current_argument, current_quaternion_float, 16);
+      target_quaternion = imu::Quaternion(current_quaternion_float[0].number, current_quaternion_float[1].number, current_quaternion_float[2].number, current_quaternion_float[3].number);
 
+      is_using_quaternion = true;
+      break;
+    case 20: //  "set_rpm"
+      memcpy(serial_stuff::current_argument, target_RPM, 16);
+
+      is_using_quaternion = false;
+      break;
+    }
+
+    serial_stuff::unparsed_from_serial = false;
+  }
+
+  if (activated)
+  {
     uint8_t pwm_values[4] = {0, 0, 0, 0}; // creating pwm values
 
-    if (test_parameters::list_of_tests[test_parameters::test_index].is_using_quaternion == true)
-    // if test is quaternion control
+    if (is_using_quaternion)
     {
-      // get target quaternion from list_of_tests
-      imu::Quaternion target_quaternion(test_parameters::list_of_tests[test_parameters::test_index].test_value[0], test_parameters::list_of_tests[test_parameters::test_index].test_value[1], test_parameters::list_of_tests[test_parameters::test_index].test_value[2], test_parameters::list_of_tests[test_parameters::test_index].test_value[3]);
-
-      // calculate required torque from previously calculated wheel torques
       imu::Vector<3> required_torque = QuaternionTorque_PD.Compute(target_quaternion, current_quaternion, current_gyro_reading);
-
       float required_wheel_torques[4];
 
       WheelController.Calculate(required_torque, required_wheel_torques);
       WheelController.Pid_Speed(required_wheel_torques, timer::loop_dt, WheelSpeed_PD, interrupt::wheel_rpm, pwm_values);
-
-      if (should_print && test_parameters::print_target_quaternion)
-      {
-        print_float_array(test_parameters::list_of_tests[test_parameters::test_index].test_value, 4, "Target Quaternion");
-      }
     }
     else
     {
-      // If not quaternion control, then it's rpm control
-
-      // Calculate wheel PWM's
-      WheelController.Test_Speed_Command(test_parameters::list_of_tests[test_parameters::test_index].test_value, interrupt::wheel_rpm, timer::loop_dt, WheelSpeed_PD, pwm_values);
-
-      if (should_print && test_parameters::print_target_RPM)
-      {
-        print_float_array(test_parameters::list_of_tests[test_parameters::test_index].test_value, 4, "Target RPM");
-      }
+      WheelController.Test_Speed_Command(target_RPM, interrupt::wheel_rpm, timer::loop_dt, WheelSpeed_PD, pwm_values);
     }
-
     write_PWM(pwm_values);
-
-    if (should_print && test_parameters::print_current_PWM)
-    {
-      print_float_array((float *)pwm_values, sizeof(pwm_values) / sizeof(pwm_values[0]), "PWMs");
-    }
   }
-  else
-  {
-    // if the current test is over, then either we advance to the next test, or there are no more tests, and the program is over
 
-    if (test_parameters::test_index < test_parameters::number_of_tests)
+  /*
+  // imu::Quaternion qe = test_parameters::target_quaternion.conjugate() * current_quaternion;
+
+  // this block of code is responsible for the testing logic
+
+
+    if ((test_parameters::list_of_tests[test_parameters::test_index].is_indefinite == true) || test_parameters::list_of_tests[test_parameters::test_index].delay_time < (millis() - test_parameters::test_init_time))
+    // this if statement checks if either the current test's time hasn't elapsed or whether the current test has the indefinite value set to true, if yes to either the test changes
     {
-      // if the current test is over, update the index to the next test, and set the next test start time as the current time
-      test_parameters::test_index++;
-      test_parameters::test_init_time = millis();
+      if a test is going on, this codeblock runs
+
+      uint8_t pwm_values[4] = {0, 0, 0, 0}; // creating pwm values
+
+      if (test_parameters::list_of_tests[test_parameters::test_index].is_using_quaternion == true)
+      // if test is quaternion control
+      {
+        // get target quaternion from list_of_tests
+        imu::Quaternion target_quaternion(test_parameters::list_of_tests[test_parameters::test_index].test_value[0], test_parameters::list_of_tests[test_parameters::test_index].test_value[1], test_parameters::list_of_tests[test_parameters::test_index].test_value[2], test_parameters::list_of_tests[test_parameters::test_index].test_value[3]);
+
+        // calculate required torque from previously calculated wheel torques
+        imu::Vector<3> required_torque = QuaternionTorque_PD.Compute(target_quaternion, current_quaternion, current_gyro_reading);
+
+        float required_wheel_torques[4];
+
+        WheelController.Calculate(required_torque, required_wheel_torques);
+        WheelController.Pid_Speed(required_wheel_torques, timer::loop_dt, WheelSpeed_PD, interrupt::wheel_rpm, pwm_values);
+
+        if (should_serial && test_parameters::print_target_quaternion)
+        {
+          print_float_array(test_parameters::list_of_tests[test_parameters::test_index].test_value, 4, "Target Quaternion");
+        }
+      }
+      else
+      {
+        // If not quaternion control, then it's rpm control
+
+        // Calculate wheel PWM's
+        WheelController.Test_Speed_Command(test_parameters::list_of_tests[test_parameters::test_index].test_value, interrupt::wheel_rpm, timer::loop_dt, WheelSpeed_PD, pwm_values);
+
+        if (should_serial && test_parameters::print_target_RPM)
+        {
+          print_float_array(test_parameters::list_of_tests[test_parameters::test_index].test_value, 4, "Target RPM");
+        }
+      }
+
+      write_PWM(pwm_values);
+
+      if (should_serial && test_parameters::print_current_PWM)
+      {
+        print_float_array((float *)pwm_values, sizeof(pwm_values) / sizeof(pwm_values[0]), "PWMs");
+      }
     }
     else
     {
-      // the program has no more tests, so after the last test times out, then the code will end up here, which is an empty function and nothing will happen
+      // if the current test is over, then either we advance to the next test, or there are no more tests, and the program is over
+
+      if (test_parameters::test_index < test_parameters::number_of_tests)
+      {
+        // if the current test is over, update the index to the next test, and set the next test start time as the current time
+        test_parameters::test_index++;
+        test_parameters::test_init_time = millis();
+      }
+      else
+      {
+        // the program has no more tests, so after the last test times out, then the code will end up here, which is an empty function and nothing will happen
+      }
     }
-  }
+    */
 }
 
 /* Setup */
@@ -315,15 +363,46 @@ static void write_PWM(uint8_t PWMs[4])
     analogWrite(physical::kPwmPins[i], abs(PWMs[i]));
   }
 }
-static void print_float_array(volatile float *array, int array_len, const char *array_identifier)
+static void pull_from_serial()
 {
-  Serial.print(array_identifier);
-  Serial.print(": ");
+  static int serial_input_parse_position = 0;
+  static bool should_read = false;
+  static bool first_char = true;
 
-  for (int i = 0; i < array_len; i++)
+  if (Serial.available() > 0)
   {
-    Serial.print(*(array + i));
+    byte read_char = Serial.read();
 
-    (i == array_len - 1) ? Serial.println("") : Serial.print(", ");
+    if (read_char == serial_stuff::start_byte)
+    {
+      should_read = true;
+      serial_input_parse_position = 0;
+      first_char = true;
+
+      memset(serial_stuff::current_argument, false, serial_stuff::max_serial_input); // clear current arg
+    }
+    else if (read_char == serial_stuff::stop_byte && should_read)
+    {
+      should_read = false;
+      serial_stuff::unparsed_from_serial = true;
+    }
+    else if (should_read)
+    {
+      if (first_char)
+      {
+        serial_stuff::current_command = read_char;
+        first_char = false;
+      }
+      else
+      {
+        serial_stuff::current_argument[serial_input_parse_position] = read_char;
+        serial_input_parse_position++;
+      }
+    }
+  }
+  else
+  {
+    serial_input_parse_position = 0;
+    should_read = false;
   }
 }

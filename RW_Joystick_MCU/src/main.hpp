@@ -41,21 +41,25 @@ namespace serial_stuff
 
     static constexpr char MCU_init_phrase[] = "<MCU_init>\n";
 
-    static constexpr uint8_t msg_key[5] = {
+    static constexpr uint8_t msg_key[] = {
         0,
 
         10,
         11,
 
+        20,
+
         254,
         255,
     };
 
-    static constexpr char msg_val[5][16] = {
+    static constexpr char msg_val[][16] = {
         "stop",
 
         "set_quaternion",
         "get_quaternion",
+
+        "get_rpm",
 
         "reserved",
         "reserved",

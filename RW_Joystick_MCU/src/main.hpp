@@ -38,8 +38,9 @@ namespace serial_stuff
 
     static constexpr char start_byte = '<';
     static constexpr char stop_byte = '>';
-
     static constexpr char MCU_init_phrase[] = "<MCU_init>\n";
+
+    static constexpr bool report_pwm = true;
 
     static constexpr uint8_t msg_key[] = {
         0, // "stop"
@@ -100,26 +101,50 @@ namespace serial_stuff
         Serial.write(serial_stuff::stop_byte);
     }
 
-    /*
-        static byte serial_data[20];
-        static bool data_to_send = false;
-        static void send_bytes_to_serial()
+    static void pull_from_serial()
+    {
+        static int serial_input_parse_position = 0;
+        static bool should_read = false;
+        static bool first_char = true;
+
+        if (Serial.available() > 0)
         {
-            if (serial_stuff::data_to_send)
+            byte read_char = Serial.read();
+
+            if (read_char == serial_stuff::start_byte)
             {
-                Serial.write(start_byte);
-                for (byte single_byte : serial_stuff::serial_data)
+                should_read = true;
+                serial_input_parse_position = 0;
+                first_char = true;
+
+                memset(serial_stuff::current_argument, false, serial_stuff::max_serial_input); // clear current arg
+            }
+            else if (read_char == serial_stuff::stop_byte && should_read)
+            {
+                should_read = false;
+                serial_stuff::unparsed_from_serial = true;
+            }
+            else if (should_read)
+            {
+                if (first_char)
                 {
-                    Serial.write(single_byte);
-                    if (single_byte == stop_byte)
-                    {
-                        serial_stuff::data_to_send = false;
-                        return;
-                    }
+                    serial_stuff::current_command = read_char;
+                    first_char = false;
+                }
+                else
+                {
+                    serial_stuff::current_argument[serial_input_parse_position] = read_char;
+                    serial_input_parse_position++;
                 }
             }
         }
-    */
+        else
+        {
+            serial_input_parse_position = 0;
+            should_read = false;
+        }
+    }
+
 } // namespace serial_stuff
 
 /* Timing */

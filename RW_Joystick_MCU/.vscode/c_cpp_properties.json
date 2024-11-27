@@ -1,0 +1,72 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
+{
+    "configurations": [
+        {
+            "name": "PlatformIO",
+            "includePath": [
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/include",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/src",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/lib/RwStatus",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/lib/PointingModes",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/lib/Controller",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/Adafruit BNO08x/src",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/Adafruit Unified Sensor",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/Adafruit BusIO",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/SD/src",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/TimerInterrupt/src",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/cores/arduino",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/variants/mega",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                ""
+            ],
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/include",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/src",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/lib/RwStatus",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/lib/PointingModes",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/lib/Controller",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/Adafruit BNO08x/src",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/Adafruit Unified Sensor",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/Adafruit BusIO",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/Wire/src",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/SD/src",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/SPI/src",
+                    "/home/darudecookie/Documents/hsl/RW_Joystick/RW_Joystick_MCU/.pio/libdeps/megaatmega2560/TimerInterrupt/src",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/cores/arduino",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/variants/mega",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/EEPROM/src",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/HID/src",
+                    "/home/darudecookie/.platformio/packages/framework-arduino-avr/libraries/SoftwareSerial/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60116",
+                "ARDUINO_AVR_MEGA2560",
+                "F_CPU=16000000L",
+                "ARDUINO_ARCH_AVR",
+                "ARDUINO=10808",
+                "__AVR_ATmega2560__",
+                ""
+            ],
+            "cStandard": "gnu11",
+            "cppStandard": "gnu++11",
+            "compilerPath": "/home/darudecookie/.platformio/packages/toolchain-atmelavr/bin/avr-gcc",
+            "compilerArgs": [
+                "-mmcu=atmega2560",
+                ""
+            ]
+        }
+    ],
+    "version": 4
+}

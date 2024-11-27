@@ -38,7 +38,6 @@ static void UpdateSysTime();
 // Returns the attitude quaternion reading in q and angular velocity in v.
 static void ReadImu(imu::Quaternion &q, imu::Vector<3> &v);
 
-static void pull_from_serial();
 
 void setup()
 {
@@ -93,22 +92,7 @@ void loop()
   UpdateSysTime();
   counter++;
 
-  // The loop reads the IMU every cycle regardless of whether
-  imu::Quaternion current_quaternion;
-  imu::Vector<3> current_gyro_reading;
-  ReadImu(current_quaternion, current_gyro_reading);
-
-  if (should_serial)
-  {
-    //  11,  "get_quaternion"
-    serial_stuff::write_quaternion_to_serial(11, current_quaternion);
-
-    //  21, "get_rpm"
-    serial_stuff::write_4_floats_to_serial(21, interrupt::wheel_rpm);
-  }
-
-  pull_from_serial();
-
+  serial_stuff::pull_from_serial();
   if (serial_stuff::unparsed_from_serial == true)
   {
     switch (serial_stuff::current_command)
@@ -133,6 +117,20 @@ void loop()
     serial_stuff::unparsed_from_serial = false;
   }
 
+  // The loop reads the IMU every cycle regardless of whether
+  imu::Quaternion current_quaternion;
+  imu::Vector<3> current_gyro_reading;
+  ReadImu(current_quaternion, current_gyro_reading);
+
+  if (should_serial)
+  {
+    //  11,  "get_quaternion"
+    serial_stuff::write_quaternion_to_serial(11, current_quaternion);
+
+    //  21, "get_rpm"
+    serial_stuff::write_4_floats_to_serial(21, interrupt::wheel_rpm);
+  }
+
   if (activated)
   {
     uint8_t pwm_values[4] = {0, 0, 0, 0}; // creating pwm values
@@ -150,6 +148,19 @@ void loop()
       WheelController.Test_Speed_Command(target_RPM, interrupt::wheel_rpm, timer::loop_dt, WheelSpeed_PD, pwm_values);
     }
     write_PWM(pwm_values);
+
+    if (serial_stuff::report_pwm && should_serial)
+    {
+      Serial.write(serial_stuff::start_byte);
+
+      //  30, "get_pwm"
+      Serial.write(static_cast<byte>(30));
+      for (int i = 0; i < 4; i++)
+      {
+        Serial.write(pwm_values[i]);
+      }
+      Serial.write(serial_stuff::stop_byte);
+    }
   }
 
   /*
@@ -361,48 +372,5 @@ static void write_PWM(uint8_t PWMs[4])
   {
     digitalWrite(physical::kDirectionPins[i], 1);
     analogWrite(physical::kPwmPins[i], abs(PWMs[i]));
-  }
-}
-static void pull_from_serial()
-{
-  static int serial_input_parse_position = 0;
-  static bool should_read = false;
-  static bool first_char = true;
-
-  if (Serial.available() > 0)
-  {
-    byte read_char = Serial.read();
-
-    if (read_char == serial_stuff::start_byte)
-    {
-      should_read = true;
-      serial_input_parse_position = 0;
-      first_char = true;
-
-      memset(serial_stuff::current_argument, false, serial_stuff::max_serial_input); // clear current arg
-    }
-    else if (read_char == serial_stuff::stop_byte && should_read)
-    {
-      should_read = false;
-      serial_stuff::unparsed_from_serial = true;
-    }
-    else if (should_read)
-    {
-      if (first_char)
-      {
-        serial_stuff::current_command = read_char;
-        first_char = false;
-      }
-      else
-      {
-        serial_stuff::current_argument[serial_input_parse_position] = read_char;
-        serial_input_parse_position++;
-      }
-    }
-  }
-  else
-  {
-    serial_input_parse_position = 0;
-    should_read = false;
   }
 }

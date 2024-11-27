@@ -59,7 +59,7 @@ class SerialGrapher:
         baud_rate: int = 115200
 
         self.Workbook_setup = False
-        self.spreadsheet_name = "testlogs/rws_test_"+str(time.ctime())+".xlsx"
+        self.spreadsheet_name = ("testlogs/rws_test_"+str(time.ctime())+".xlsx").replace(":",".")
         # don't want to fully rewrite/overwrite the save file every cycle bc laggy
         self.cycles_between_saves = 10
         self.spreadsheet_entry = DataEntry()
